@@ -6,9 +6,11 @@ stages:
     cmd: python defects_in_welds/data/data_module.py prepare
     # Входные данные (версионированные с помощью dvc add)
     deps:
-      - data/train.dvc
-      - data/valid.dvc
-      - data/test.dvc
+      - data/train
+      - data/valid
+      - data/test
+    outs:
+      - data_prepared.txt
     # Выходные параметры (метрики или артефакты)
     params:
       - prepare.img_size
