@@ -1,0 +1,32 @@
+[project]
+name = "defects-in-welds"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "admin",email = "basirgazhin@edu.hse.ru"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "torch (>=2.9.1,<3.0.0)",
+    "pytorch-lightning (>=2.6.0,<3.0.0)",
+    "hydra-core (>=1.3.2,<2.0.0)",
+    "mlflow (>=3.7.0,<4.0.0)",
+    "dvc (>=3.64.2,<4.0.0)",
+    "fire (>=0.7.1,<0.8.0)",
+    "torchvision (>=0.24.1,<0.25.0)",
+    "albumentations (>=2.0.8,<3.0.0)",
+    "numpy (>=2.3.5,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pre-commit (>=4.5.0,<5.0.0)",
+    "ruff (>=0.14.9,<0.15.0)"
+]
