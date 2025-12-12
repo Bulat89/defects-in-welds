@@ -1,0 +1,53 @@
+stages:
+  # ====================================================================
+  # 1. СТАДИЯ ПОДГОТОВКИ ДАННЫХ
+  # ====================================================================
+  prepare:
+    cmd: python defects_in_welds/data/data_module.py prepare
+    # Входные данные (версионированные с помощью dvc add)
+    deps:
+      - data/train.dvc
+      - data/valid.dvc
+      - data/test.dvc
+    # Выходные параметры (метрики или артефакты)
+    params:
+      - prepare.img_size
+      - prepare.augmentations
+
+  # ====================================================================
+  # 2. СТАДИЯ ОБУЧЕНИЯ МОДЕЛИ
+  # ====================================================================
+  train:
+    cmd: python defects_in_welds/training/run_training.py
+    # Входные данные (зависит от стадии 'prepare')
+    deps:
+      - defects_in_welds/data/data_module.py
+      - defects_in_welds/model/model.py
+      - defects_in_welds/training/lit_module.py
+      - configs/
+    # Зависит от:
+    outs:
+      - checkpoints/best_model.ckpt
+    # Метрики и логирование (MLflow)
+    metrics:
+      - metrics/history.json:
+          cache: false
+    params:
+      - training.max_epochs
+      - training.batch_size
+      - training.learning_rate
+      - model.architecture
+
+  # ====================================================================
+  # 3. СТАДИЯ ОЦЕНКИ
+  # ====================================================================
+  evaluate:
+    cmd: python defects_in_welds/training/run_evaluation.py
+    # Зависит от лучшей модели и тестового набора
+    deps:
+      - checkpoints/best_model.ckpt
+      - defects_in_welds/data/data_module.py
+    # Метрики для финальной оценки
+    metrics:
+      - metrics/final_metrics.json:
+          cache: false
