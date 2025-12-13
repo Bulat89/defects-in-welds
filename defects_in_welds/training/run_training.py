@@ -33,7 +33,7 @@ def run_training(cfg):
     # MLflowLogger автоматически сохранит все гиперпараметры (cfg)
     mlflow_logger = MLFlowLogger(
         experiment_name="welding_defect_detection",
-        run_name=f"run_e{cfg.training.max_epochs}_b{cfg.training.batch_size}",
+        run_name=f"run_e{cfg.train.max_epochs}_b{cfg.train.batch_size}",  # ИСПРАВЛЕНО: cfg.train
         tracking_uri="file:./mlruns",  # Локальное хранилище MLflow
     )
     log.info(f"MLflow Logger initialized. Experiment: {mlflow_logger.experiment_id}")
@@ -54,7 +54,7 @@ def run_training(cfg):
     # 3. DataModule
     dm = DefectDataModule(
         data_root="data",
-        batch_size=cfg.training.batch_size,
+        batch_size=cfg.train.batch_size,  # ИСПРАВЛЕНО: cfg.train
         image_size=cfg.prepare.img_size,
         augmentations=cfg.prepare.augmentations,
     )
@@ -62,14 +62,17 @@ def run_training(cfg):
 
     # 4. LightningModule (Модель)
     # num_classes = число дефектов + 1 (фон)
+    # Внимание: cfg.model.num_classes может вызвать следующую ошибку,
+    # если num_classes не находится в разделе 'model' в params.yaml.
     num_classes_total = cfg.model.num_classes + 1
     model = DefectLitModule(
-        num_classes=num_classes_total, learning_rate=cfg.training.learning_rate
+        num_classes=num_classes_total,
+        learning_rate=cfg.train.learning_rate,  # ИСПРАВЛЕНО: cfg.train
     )
 
     # 5. Trainer
     trainer = pl.Trainer(
-        max_epochs=cfg.training.max_epochs,
+        max_epochs=cfg.train.max_epochs,  # ИСПРАВЛЕНО: cfg.train
         logger=mlflow_logger,
         callbacks=[checkpoint_callback, lr_monitor],
         accelerator="auto",  # Использует GPU, если доступен
@@ -82,7 +85,7 @@ def run_training(cfg):
     # 7. Фиксация истории обучения (для DVC metrics)
     # Извлекаем метрики из MLflow (или просто создаем заглушку)
     history = {
-        "max_epochs": cfg.training.max_epochs,
+        "max_epochs": cfg.train.max_epochs,  # ИСПРАВЛЕНО: cfg.train
         "final_val_mAP": trainer.callback_metrics.get("val_mAP").item()
         if trainer.callback_metrics.get("val_mAP")
         else None,
