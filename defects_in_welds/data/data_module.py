@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import Optional, List, Any
-
+import cv2
 import torch
 import numpy as np
 import pytorch_lightning as pl
@@ -57,7 +57,9 @@ class WeldingDefectsDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, dict[str, Any]]:
         # 1. Загрузка изображения
         image_path = self.image_files[idx]
-        image = np.array(A.augmentations.functional.read_rgb_image(image_path))
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Преобразуем из BGR в RGB
+        # image = np.array(image) # cv2.imread уже возвращает numpy array
 
         # 2. Загрузка аннотаций YOLO (class_id x_center y_center w h)
         boxes = []
@@ -195,6 +197,7 @@ class DefectDataModule(pl.LightningDataModule):
             shuffle=True,
             collate_fn=self.collate_fn,
             num_workers=os.cpu_count() // 2,
+            persistent_workers=True,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -204,6 +207,7 @@ class DefectDataModule(pl.LightningDataModule):
             shuffle=False,
             collate_fn=self.collate_fn,
             num_workers=os.cpu_count() // 2,
+            persistent_workers=True,
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -213,6 +217,7 @@ class DefectDataModule(pl.LightningDataModule):
             shuffle=False,
             collate_fn=self.collate_fn,
             num_workers=os.cpu_count() // 2,
+            persistent_workers=True,
         )
 
 
