@@ -22,9 +22,6 @@ log = logging.getLogger(__name__)
 class WeldingDefectsDataset(Dataset):
     """
     Класс датасета для обнаружения дефектов сварки.
-    Предполагает структуру данных YOLO:
-    - images/ (изображения)
-    - labels/ (соответствующие .txt файлы с аннотациями YOLO)
     """
 
     def __init__(
@@ -58,48 +55,96 @@ class WeldingDefectsDataset(Dataset):
         # 1. Загрузка изображения
         image_path = self.image_files[idx]
         image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Преобразуем из BGR в RGB
-        # image = np.array(image) # cv2.imread уже возвращает numpy array
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # Получаем высоту и ширину исходного изображения
+        H, W, _ = image.shape
 
         # 2. Загрузка аннотаций YOLO (class_id x_center y_center w h)
-        boxes = []
+        boxes_denormalized = []  # Формат: PASCAL_VOC [xmin, ymin, xmax, ymax] (в ПИКСЕЛЯХ)
         labels = []
+        has_boxes = False
         label_path = self.label_files[idx]
 
         if os.path.exists(label_path):
             with open(label_path, "r") as f:
                 for line in f.readlines():
                     try:
-                        # Парсинг: class_id, x_c, y_c, w, h (в нормализованных координатах 0-1)
+                        # Парсинг: class_id, x_c, y_c, w, h (нормализованные 0-1)
                         class_id, x_c, y_c, w, h = map(float, line.split())
-                        boxes.append([x_c, y_c, w, h])  # Нормализованные
-                        labels.append(int(class_id))
+
+                        # КЛЮЧЕВОЙ ШАГ: Конвертация YOLO (normalized) -> PASCAL_VOC (denormalized, ПИКСЕЛИ)
+                        xmin = (x_c - w / 2) * W
+                        ymin = (y_c - h / 2) * H
+                        xmax = (x_c + w / 2) * W
+                        ymax = (y_c + h / 2) * H
+
+                        # Гарантируем корректность (x_min < x_max и т.д.) перед подачей в Albumentations
+                        # и удаляем рамки с нулевой или отрицательной площадью
+                        if xmax > xmin and ymax > ymin:
+                            boxes_denormalized.append([xmin, ymin, xmax, ymax])
+                            labels.append(int(class_id))
+                            has_boxes = True
+
                     except ValueError:
-                        # Пропускаем некорректные строки
                         continue
 
-        if not boxes:
-            # Если аннотаций нет, добавляем фиктивные данные для Albumentations
-            boxes = np.array([[0, 0, 1, 1]])  # Нормализованные координаты
-            labels = np.array([-1])  # Фиктивный класс
-
         # 3. Применение трансформ Albumentations
-        transformed = self.transforms(image=image, bboxes=boxes, class_labels=labels)
+
+        if not has_boxes:
+            # Если аннотаций нет, применяем только image-трансформации и возвращаем пустой таргет
+            # Это позволяет избежать передачи пустых bboxes в A.Compose,
+            # где bboxes_params = PASCAL_VOC
+            transformed = self.transforms(image=image)
+            image_tensor = transformed["image"]
+            target = {
+                "boxes": torch.empty((0, 4), dtype=torch.float32),
+                "labels": torch.empty((0,), dtype=torch.int64),
+            }
+            return image_tensor, target
+
+        boxes_for_augment = np.array(boxes_denormalized)
+        labels_for_augment = np.array(labels)
+
+        # Albumentations принимает PASCAL_VOC в пикселях (если BboxParams настроен правильно)
+        transformed = self.transforms(
+            image=image, bboxes=boxes_for_augment, class_labels=labels_for_augment
+        )
 
         image = transformed["image"]
-        # Albumentations возвращает bboxes в PASCAL_VOC (x_min, y_min, x_max, y_max)
-        bboxes = torch.tensor(transformed["bboxes"], dtype=torch.float32)
-        labels = torch.tensor(transformed["class_labels"], dtype=torch.int64)
+        bboxes = transformed["bboxes"]
+        labels = transformed["class_labels"]
 
-        # 4. Формирование целевого словаря для PyTorch/Torchvision
+        # 4. Финальная обработка для Torchvision
+
+        final_boxes = []
+        final_labels = []
+
+        for box, label in zip(bboxes, labels):
+            # Albumentations уже должен был отфильтровать и обрезать bboxes, но
+            # всегда стоит добавить проверку на всякий случай
+            xmin, ymin, xmax, ymax = box[:4]
+
+            # Torchvision требует int64 метки
+            int_label = int(label)
+
+            # Гарантируем положительную ширину/высоту (требование Torchvision)
+            # Albumentations обрезает рамки до границ изображения, но мы
+            # еще раз проверяем на минимальность
+            if xmax > xmin and ymax > ymin:
+                final_boxes.append([xmin, ymin, xmax, ymax])
+                final_labels.append(int_label)
+
+        # 5. Формирование целевого словаря для PyTorch/Torchvision
         target = {}
-        # Если фиктивный класс, делаем его пустым
-        if (labels == -1).all():
+
+        if not final_boxes:
             target["boxes"] = torch.empty((0, 4), dtype=torch.float32)
             target["labels"] = torch.empty((0,), dtype=torch.int64)
         else:
-            target["boxes"] = bboxes
-            target["labels"] = labels
+            # bboxes уже в пикселях, что требуется Torchvision
+            target["boxes"] = torch.tensor(final_boxes, dtype=torch.float32)
+            target["labels"] = torch.tensor(final_labels, dtype=torch.int64)
 
         return image, target
 
@@ -127,10 +172,24 @@ class DefectDataModule(pl.LightningDataModule):
         self.image_size = image_size
         self.augmentations = augmentations
 
+    # КОРРЕКТИРОВКА: Настройка для работы с ПИКСЕЛЯМИ (PASCAL_VOC)
+    def _get_bbox_params(self):
+        return A.BboxParams(
+            # Используем PASCAL_VOC, который ожидает ПИКСЕЛИ в старых версиях Albumentations
+            format="pascal_voc",
+            label_fields=["class_labels"],
+            # min_area и min_visibility используются для удаления невалидных рамок
+            min_area=1.0,
+            min_visibility=0.1,
+        )
+
     def setup(self, stage: Optional[str] = None):
         """Создание наборов данных (Dataset) для train/val/test."""
+        bbox_params = self._get_bbox_params()
 
-        # --- 1. Определение трансформ (как в configs/main.yaml) ---
+        # --- 1. Определение трансформ ---
+        # NOTE: always_apply=True для Resize, Normalize и ToTensorV2
+        # является избыточным, но не вредит
         base_transforms = [
             A.Resize(self.image_size[0], self.image_size[1]),
             A.Normalize(
@@ -139,6 +198,7 @@ class DefectDataModule(pl.LightningDataModule):
             ToTensorV2(),
         ]
 
+        # Для Augmentations используем A.BboxParams
         if self.augmentations and stage == "fit":
             train_transforms = A.Compose(
                 [
@@ -149,18 +209,18 @@ class DefectDataModule(pl.LightningDataModule):
                     A.RandomBrightnessContrast(p=0.2),
                     *base_transforms,
                 ],
-                bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"]),
-            )  # Вход YOLO
+                bbox_params=bbox_params,
+            )
         else:
-            # Валидация/Тестирование без аугментаций
+            # Если нет аугментаций, A.Compose все равно необходим для применения base_transforms
             train_transforms = A.Compose(
                 base_transforms,
-                bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"]),
+                bbox_params=bbox_params,
             )
 
         val_test_transforms = A.Compose(
             base_transforms,
-            bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"]),
+            bbox_params=bbox_params,
         )
 
         # --- 2. Создание Dataset ---
@@ -172,9 +232,7 @@ class DefectDataModule(pl.LightningDataModule):
                 transforms=train_transforms,
             )
             self.val_ds = WeldingDefectsDataset(
-                data_dir=os.path.join(
-                    self.data_root, "valid"
-                ),  # Используем 'valid' как в DVC
+                data_dir=os.path.join(self.data_root, "valid"),
                 image_size=self.image_size,
                 transforms=val_test_transforms,
             )
@@ -190,14 +248,14 @@ class DefectDataModule(pl.LightningDataModule):
     def collate_fn(self, batch):
         return tuple(zip(*batch))
 
+    # num_workers = 0 для Windows
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
             self.train_ds,
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=self.collate_fn,
-            num_workers=os.cpu_count() // 2,
-            persistent_workers=True,
+            num_workers=0,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -206,8 +264,7 @@ class DefectDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             collate_fn=self.collate_fn,
-            num_workers=os.cpu_count() // 2,
-            persistent_workers=True,
+            num_workers=0,
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -216,8 +273,7 @@ class DefectDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             collate_fn=self.collate_fn,
-            num_workers=os.cpu_count() // 2,
-            persistent_workers=True,
+            num_workers=0,
         )
 
 
@@ -230,8 +286,6 @@ def prepare(img_size: int = 640, augmentations: bool = True):
     """
     DVC-стадия 'prepare'. Просто проверяет, что данные доступны и
     соответствуют требуемым параметрам.
-
-    Вызывается DVC: cmd: python defects_in_welds/data/data_module.py prepare
     """
     log.info("--- DVC STAGE: PREPARE ---")
     log.info(f"Image Size Parameter: {img_size}x{img_size}")
@@ -258,5 +312,4 @@ def prepare(img_size: int = 640, augmentations: bool = True):
 
 
 if __name__ == "__main__":
-    # Fire позволяет легко превратить функции в CLI-интерфейс
     fire.Fire({"prepare": prepare, "datamodule": DefectDataModule})
