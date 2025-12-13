@@ -1,0 +1,31 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python defects_in_welds/data/data_module.py prepare
+    deps:
+    - path: data/test
+      hash: md5
+      md5: 2478ab64069ad213503ddadff568b044.dir
+      size: 3700039
+      nfiles: 148
+    - path: data/train
+      hash: md5
+      md5: 4cf65ed5d643c195104744aa580e2db1.dir
+      size: 43571732
+      nfiles: 1678
+    - path: data/valid
+      hash: md5
+      md5: e9f846d4d2ee35712779afb464bde848.dir
+      size: 8646916
+      nfiles: 352
+    params:
+      params.yaml:
+        prepare.augmentations: true
+        prepare.img_size:
+        - 640
+        - 640
+    outs:
+    - path: data_prepared.txt
+      hash: md5
+      md5: 66204ad6f8f477aaad8aea35654fdde9
+      size: 26
