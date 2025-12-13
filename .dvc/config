@@ -1,5 +1,9 @@
 [core]
-	remote = local_storage
+    remote = yandex_s3
 
-[remote "local_storage"]
-	url = ./dvc_storage
+[remote "yandex_s3"]
+    url = s3://defects123131
+    endpointurl = https://storage.yandexcloud.net
+    region = ru-central1
+    access_key_id = ...
+    secret_access_key = ...
