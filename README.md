@@ -86,7 +86,7 @@ python -m defects_in_welds.training.run_training train.batch_size=4 trainer.prec
 
 # код для запуска в colab
 
-***
+```bash
 from google.colab import userdata
 import os
 
@@ -135,7 +135,7 @@ print("requirements.txt создан и готов к использованию
 
 # подготовка 
 !python /content/defects-in-welds/defects_in_welds/data/data_module.py prepare --img_size 640 --augmentations True
-***
+```bash
 
 # запуск обуяения
 
