@@ -1,11 +1,20 @@
 stages:
   # ====================================================================
+  # 0. СТАДИЯ ЗАГРУЗКИ ДАННЫХ
+  # ====================================================================
+  pull_data:
+    cmd: python commands.py pull
+    deps:
+      - commands.py
+
+  # ====================================================================
   # 1. СТАДИЯ ПОДГОТОВКИ ДАННЫХ
   # ====================================================================
   prepare:
     cmd: python defects_in_welds/data/data_module.py prepare
-    # Входные данные (версионированные с помощью dvc add)
+    # Зависит от скрипта и исходных данных, которые были загружены
     deps:
+      - defects_in_welds/data/data_module.py
       - data/train
       - data/valid
       - data/test
@@ -21,12 +30,14 @@ stages:
   # ====================================================================
   train:
     cmd: python defects_in_welds/training/run_training.py
-    # Входные данные (зависит от стадии 'prepare')
+    # Зависит от кода и артефакта предыдущей стадии
     deps:
+      - defects_in_welds/training/run_training.py
       - defects_in_welds/data/data_module.py
       - defects_in_welds/model/model.py
       - defects_in_welds/training/lit_module.py
-      - configs/
+      - configs/params.yaml
+      - data_prepared.txt # Явная зависимость от выхода 'prepare'
     # Зависит от:
     outs:
       - checkpoints/best_model.ckpt
@@ -47,8 +58,9 @@ stages:
     cmd: python defects_in_welds/training/run_evaluation.py
     # Зависит от лучшей модели и тестового набора
     deps:
+      - defects_in_welds/training/run_evaluation.py
       - checkpoints/best_model.ckpt
-      - defects_in_welds/data/data_module.py
+      - defects_in_welds/data/data_module.py # Для загрузки тестовых данных
     # Метрики для финальной оценки
     metrics:
       - metrics/final_metrics.json:
