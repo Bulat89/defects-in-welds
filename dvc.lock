@@ -29,3 +29,10 @@ stages:
       hash: md5
       md5: 66204ad6f8f477aaad8aea35654fdde9
       size: 26
+  pull_data:
+    cmd: python commands.py pull
+    deps:
+    - path: commands.py
+      hash: md5
+      md5: eccc09f46626d9fc9067d4554a73a845
+      size: 980

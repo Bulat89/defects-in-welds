@@ -1,6 +1,5 @@
 import hydra
 import logging
-import os
 import json
 
 import pytorch_lightning as pl
@@ -93,8 +92,11 @@ def run_training(cfg):
     }
 
     # Записываем историю в файл, который DVC будет отслеживать
-    os.makedirs("metrics", exist_ok=True)
-    with open("metrics/history.json", "w") as f:
+    from pathlib import Path
+
+    metrics_dir = Path("metrics")
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    with open(metrics_dir / "history.json", "w") as f:
         json.dump(history, f, indent=4)
 
     log.info(
