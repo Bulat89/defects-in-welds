@@ -255,7 +255,7 @@ class DefectDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=self.collate_fn,
-            num_workers=0,
+            num_workers=2,
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -264,7 +264,7 @@ class DefectDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             collate_fn=self.collate_fn,
-            num_workers=0,
+            num_workers=2,
         )
 
     def test_dataloader(self) -> DataLoader:
@@ -273,7 +273,7 @@ class DefectDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             collate_fn=self.collate_fn,
-            num_workers=0,
+            num_workers=2,
         )
 
 
