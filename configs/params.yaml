@@ -28,13 +28,13 @@ train:
 
   # Гиперпараметры процесса обучения
   learning_rate: 0.0001
-  batch_size: 16
+  batch_size: 8
   max_epochs: 20
   loss_function: "DiceLoss"
   optimizer: "Adam"
 
   # Настройки среды
-  device: "cpu" # или "cpu" cuda
+  device: "cuda" # или "cpu" cuda
 
   # ==================================
   # Параметры для Model (необходимо для run_training.py)
@@ -42,4 +42,4 @@ train:
 model:
     # Количество классов дефектов (например, 4 типа дефектов)
     # num_classes = число дефектов БЕЗ учета фона
-    num_classes: 4
+    num_classes: 3
