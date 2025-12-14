@@ -70,7 +70,7 @@
 
 Для запуска полного цикла, который включает подготовку данных и тренировку модели, используйте DVC:
 
-```bash
+
 # Выполняет последовательно: prepare -> train, согласно DVC.yaml
 dvc repro
 
@@ -78,7 +78,7 @@ dvc repro
 
 Используйте Hydra для запуска, если вам нужно временно изменить параметры без редактирования `params.yaml` (например, для локальной отладки или тестирования GPU).
 
-```bash
+
 # Пример: Установить batch_size=4 и precision='16-mixed'
 python -m defects_in_welds.training.run_training train.batch_size=4 trainer.precision=16-mixed
 
