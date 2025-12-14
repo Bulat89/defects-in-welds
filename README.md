@@ -39,20 +39,22 @@
 
 Убедитесь, что Poetry установлен в вашей системе. Затем, в корне проекта, создайте и активируйте виртуальное окружение:
 
-```bash
-# 1. Установите все зависимости, указанные в pyproject.toml
-poetry install
-
-# 2. Активация окружения для работы с командами проекта
-poetry shell
+    ```bash
+    # 1. Установите все зависимости, указанные в pyproject.toml
+    poetry install
+    
+    # 2. Активация окружения для работы с командами проекта
+    poetry shell
 
 ### 1.2. Инициализация DVC и загрузка данных
 
-После настройки окружения, необходимо получить сам набор данных, который версионируется с помощью DVC.
+    После настройки окружения, необходимо получить сам набор данных, который версионируется с помощью DVC.
+    
+    ```bash
+    # Получение данных (изображений и аннотаций)
+    dvc pull
 
-```bash
-# Получение данных (изображений и аннотаций)
-dvc pull
+***
 
 ### 2. Train: Запуск конвейера обучения
 
@@ -84,6 +86,7 @@ python -m defects_in_welds.training.run_training train.batch_size=4 trainer.prec
 
 # код для запуска в colab
 
+***
 from google.colab import userdata
 import os
 
@@ -132,7 +135,7 @@ print("requirements.txt создан и готов к использованию
 
 # подготовка 
 !python /content/defects-in-welds/defects_in_welds/data/data_module.py prepare --img_size 640 --augmentations True
-
+***
 
 # запуск обуяения
 
