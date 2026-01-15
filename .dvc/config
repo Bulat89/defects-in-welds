@@ -1,9 +1,0 @@
-[core]
-    remote = yandex_s3
-
-[remote "yandex_s3"]
-    url = s3://defects123131
-    endpointurl = https://storage.yandexcloud.net
-    region = ru-central1
-    access_key_id = YCAJE93egGAF3H-bvGA-eLtEV
-    secret_access_key = YCPNUpMBCQ44uJgQuVGj0pHC0h2gszXrRWp5ZUto
