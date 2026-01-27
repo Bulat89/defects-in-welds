@@ -70,15 +70,27 @@ class DefectLitModule(pl.LightningModule):
         """
         images, targets = batch
 
-        # Модель в режиме оценки возвращает список предсказаний
-        # (boxes, labels, scores)
-        preds = self.model(images)
+        # В режиме обучения/валидации модель возвращает словарь потерь
+        loss_dict = self.model(images, targets)
+        total_loss = sum(loss for loss in loss_dict.values())
+        self.log(
+            "val_loss",
+            total_loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
 
-        # Обновление метрики mAP (Mean Average Precision)
-        # Требует: preds (список dict), targets (список dict)
+        # В режиме оценки модель возвращает предсказания
+        self.model.eval()
+        preds = self.model(images)
+        self.model.train()
+
+        # Обновление метрики mAP
         self.val_map.update(preds, targets)
 
-        return self.val_map
+        return {"val_loss": total_loss, "val_map": self.val_map}
 
     def on_validation_epoch_end(self):
         """
